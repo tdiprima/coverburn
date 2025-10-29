@@ -59,7 +59,7 @@ Accession #: 1234567
 * Comparison metrics between OCR engines
 * Preprocessing tweaks for rotation, blur, and low contrast
 
-## 🧑‍💻 Author
+## 👩‍💻 Author
 
 **Bear** — DevOps engineer, slide whisperer, and Tesseract survivor.
 
