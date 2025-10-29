@@ -32,6 +32,13 @@ if len(pixel_array.shape) == 2:
 # Save or convert to PIL Image
 img = Image.fromarray(pixel_array)
 
+# Debug: Save image to inspect it
+img.save("debug_output.png")
+print(f"Image saved as debug_output.png")
+print(f"Image shape: {np.array(img).shape}")
+print(f"Image size: {img.size}")
+print(f"Pixel value range: {np.min(np.array(img))} to {np.max(np.array(img))}")
+
 # --- PaddleOCR ---
 ocr = PaddleOCR(use_angle_cls=True, lang="en")
 paddle_results = ocr.predict(np.array(img))
