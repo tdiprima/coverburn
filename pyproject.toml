@@ -1,0 +1,15 @@
+[project]
+name = "coverburn"
+version = "0.1.0"
+description = "Reads cover slides"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.3.4",
+    "opencv-python>=4.11.0.86",
+    "paddleocr>=3.3.1",
+    "paddlepaddle>=3.2.0",
+    "pillow>=12.0.0",
+    "pydicom>=3.0.1",
+    "pytesseract>=0.3.13",
+]
