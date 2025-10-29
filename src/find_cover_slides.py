@@ -101,9 +101,9 @@ def analyze_dicom_file(file_path: Path) -> Dict:
 
 
 def find_dicom_files(root_dir: Path, extensions: List[str] = None) -> List[Path]:
-    """Recursively find all DICOM files in directory."""
+    """Recursively find all .dat files in directory."""
     if extensions is None:
-        extensions = [".dcm", ".dicom", ".dat", ""]
+        extensions = [".dat"]
 
     dicom_files = []
 
@@ -111,14 +111,9 @@ def find_dicom_files(root_dir: Path, extensions: List[str] = None) -> List[Path]
         for file in files:
             file_path = Path(root) / file
 
-            # Check by extension first
-            if file_path.suffix.lower() in extensions or file_path.suffix == "":
-                # Try to verify it's actually a DICOM file
-                try:
-                    pydicom.dcmread(file_path, stop_before_pixels=True)
-                    dicom_files.append(file_path)
-                except Exception:
-                    continue
+            # Only match .dat files
+            if file_path.suffix.lower() in extensions:
+                dicom_files.append(file_path)
 
     return dicom_files
 
@@ -140,11 +135,6 @@ def main():
         type=int,
         default=3,
         help="Minimum score to consider a file as cover slide (default: 3)",
-    )
-    parser.add_argument(
-        "--show-all",
-        action="store_true",
-        help="Show all DICOM files, not just potential cover slides",
     )
 
     args = parser.parse_args()
@@ -175,33 +165,13 @@ def main():
     cover_slides = [r for r in results if r["score"] >= args.min_score]
 
     if cover_slides:
-        print(f"\n🎯 POTENTIAL COVER SLIDES ({len(cover_slides)} found):")
+        print(f"\n🎯 COVER SLIDES FOUND ({len(cover_slides)}):")
         print("=" * 80)
 
         for result in cover_slides:
-            print(f"\n📄 {result['path']}")
-            print(f"   Score: {result['score']}")
-            print(f"   Reasons: {', '.join(result['reasons'])}")
-            print(f"   Patient ID: {result['metadata']['PatientID']}")
-            print(f"   Study: {result['metadata']['StudyDescription']}")
-            print(f"   Series: {result['metadata']['SeriesDescription']}")
-            print(f"   Modality: {result['metadata']['Modality']}")
-            print(f"   Instance: {result['metadata']['InstanceNumber']}")
+            print(f"{result['path']}")
     else:
-        print("\n❌ No potential cover slides found")
-
-    if args.show_all:
-        print("\n📋 ALL DICOM FILES:")
-        print("=" * 80)
-
-        for result in results:
-            if result["score"] < args.min_score:
-                print(f"\n{result['path']}")
-                print(f"   Score: {result['score']}")
-                if result["reasons"]:
-                    print(f"   Reasons: {', '.join(result['reasons'])}")
-                print(f"   Modality: {result['metadata']['Modality']}")
-                print(f"   Image Type: {result['metadata']['ImageType']}")
+        print("\n❌ No cover slides found")
 
 
 if __name__ == "__main__":
