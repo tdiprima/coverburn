@@ -14,4 +14,5 @@ dependencies = [
     "pylibjpeg>=2.1.0",
     "pylibjpeg-libjpeg>=2.3.0",
     "pytesseract>=0.3.13",
+    "rich-argparse>=1.7.1",
 ]
