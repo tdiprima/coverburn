@@ -7,7 +7,7 @@ from paddleocr import PaddleOCR
 import pytesseract
 
 # Path to one DICOM file
-dcm_path = "sample.dcm"
+dcm_path = "sample.dat"
 
 # Read the DICOM file
 ds = pydicom.dcmread(dcm_path)
