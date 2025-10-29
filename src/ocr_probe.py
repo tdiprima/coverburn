@@ -37,9 +37,15 @@ ocr = PaddleOCR(use_angle_cls=True, lang="en")
 paddle_results = ocr.predict(np.array(img))
 
 print("=== PaddleOCR Results ===")
-for line in paddle_results[0]:
-    text, conf = line[1][0], line[1][1]
-    print(f"{text} (conf: {conf:.2f})")
+if paddle_results and len(paddle_results) > 0:
+    for result in paddle_results:
+        if result.get("dt_polys"):
+            print(f"Text detected: {result.get('rec_text', 'N/A')}")
+            print(f"Confidence: {result.get('rec_score', 0):.2f}")
+        else:
+            print("No text detected in image")
+else:
+    print("No results from PaddleOCR")
 
 # --- Optional: Tesseract comparison ---
 try:
