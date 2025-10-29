@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 import pydicom
-from pydicom.misc import isdicom
+from pydicom.misc import is_dicom
 
 # Keywords that often hint "cover/label/title" style images
 SERIES_HINTS = [
@@ -125,13 +125,13 @@ def iter_candidates(root, exts=(".dcm", ".dat")):
         if exts and p.suffix.lower() not in exts:
             # Some sites ditch extensions; peek header quickly
             try:
-                if not isdicom(str(p)):
+                if not is_dicom(str(p)):
                     continue
             except Exception:
                 continue
         else:
             try:
-                if not isdicom(str(p)):
+                if not is_dicom(str(p)):
                     continue
             except Exception:
                 continue
@@ -140,7 +140,7 @@ def iter_candidates(root, exts=(".dcm", ".dat")):
 
 def main():
     ap = argparse.ArgumentParser(description="Scout likely cover-slide DICOMs fast.")
-    ap.add_argument("path", help="Directory to scan (e.g., /data2/rsnacontrolCT)")
+    ap.add_argument("path", help="Directory to scan (e.g., /data2/radimages/rsnacontrolCT)")
     ap.add_argument(
         "--top", type=int, default=50, help="Show top-N candidates (default: 50)"
     )
