@@ -25,6 +25,10 @@ pixel_array = (pixel_array - np.min(pixel_array)) / (
 )
 pixel_array = (pixel_array * 255).astype(np.uint8)
 
+# Convert grayscale to RGB (PaddleOCR requires 3 channels)
+if len(pixel_array.shape) == 2:
+    pixel_array = np.stack([pixel_array] * 3, axis=-1)
+
 # Save or convert to PIL Image
 img = Image.fromarray(pixel_array)
 
