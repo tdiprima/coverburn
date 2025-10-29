@@ -1,10 +1,14 @@
 # Minimal test script, very "engineer prototyping at 2 a.m." energy
-import os
-import pydicom
+
+import warnings
+
 import numpy as np
-from PIL import Image
-from paddleocr import PaddleOCR
+import pydicom
 import pytesseract
+from paddleocr import PaddleOCR
+from PIL import Image
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Path to one DICOM file
 dcm_path = "sample.dat"
@@ -16,15 +20,17 @@ ds = pydicom.dcmread(dcm_path)
 pixel_array = ds.pixel_array
 
 # Normalize and convert to uint8 for image processing
-pixel_array = (pixel_array - np.min(pixel_array)) / (np.max(pixel_array) - np.min(pixel_array))
+pixel_array = (pixel_array - np.min(pixel_array)) / (
+    np.max(pixel_array) - np.min(pixel_array)
+)
 pixel_array = (pixel_array * 255).astype(np.uint8)
 
 # Save or convert to PIL Image
 img = Image.fromarray(pixel_array)
 
 # --- PaddleOCR ---
-ocr = PaddleOCR(use_angle_cls=True, lang='en')
-paddle_results = ocr.ocr(np.array(img), cls=True)
+ocr = PaddleOCR(use_angle_cls=True, lang="en")
+paddle_results = ocr.predict(np.array(img))
 
 print("=== PaddleOCR Results ===")
 for line in paddle_results[0]:
