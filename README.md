@@ -6,6 +6,8 @@ OCR showdown for pathology and radiology cover slides — PaddleOCR vs Tesseract
 
 It was born from frustration with traditional OCR tools fumbling text on medical images (looking at you, `$` vs `S` 👀).
 
+Use tag `0.1.0`.
+
 ## 🚀 Features
 - Reads **DICOM** or `.dat` files directly (even if renamed)
 - Extracts pixel data with `pydicom`
