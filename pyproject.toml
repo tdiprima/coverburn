@@ -1,6 +1,6 @@
 [project]
 name = "coverburn"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reads cover slides, performs OCR"
 readme = "README.md"
 requires-python = ">=3.12"
