@@ -1,243 +1,177 @@
-# Heuristic finder for likely "cover slides" inside giant DICOM dirs.
+"""
+Search through DICOM folders to identify potential cover slides.
+Cover slides typically have:
+- Image type containing "LOCALIZER", "SCOUT", or "SECONDARY"
+- Lower instance numbers (often first in series)
+- Different modality characteristics
+- Potentially embedded text or annotations
+"""
 
 import argparse
-import csv
-import re
+import os
 from pathlib import Path
+from typing import Dict, List
 
 import pydicom
-from pydicom.misc import is_dicom
-
-# Keywords that often hint "cover/label/title" style images
-SERIES_HINTS = [
-    "cover",
-    "label",
-    "slide",
-    "title",
-    "front",
-    "burn",
-    "debug",
-    "deid",
-    "doc",
-    "scan doc",
-    "scanned",
-    "report",
-]
-
-# Modalities that are more likely to be non-body-slice images
-NON_CT_MODALITIES = {"OT", "SC", "SM", "XC", "DOC", "PR"}
+from rich_argparse import RichHelpFormatter
 
 
-def safe_get(ds, name, default=None):
-    try:
-        return getattr(ds, name)
-    except Exception:
-        return default
-
-
-def ratio(rows, cols):
-    try:
-        r = float(rows)
-        c = float(cols)
-        if r == 0 or c == 0:
-            return 1.0
-        return max(r, c) / min(r, c)
-    except Exception:
-        return 1.0
-
-
-def score_dicom(ds):
+def is_potential_cover_slide(ds: pydicom.Dataset) -> Dict[str, any]:
     """
-    Return (score, reasons[]) — higher = more likely a cover slide.
-    We keep it additive and explainable.
+    Analyze DICOM metadata to determine if this might be a cover slide.
+    Returns a dict with score and reasons.
     """
     score = 0
     reasons = []
 
-    modality = str(safe_get(ds, "Modality", "")).upper()
-    photometric = str(safe_get(ds, "PhotometricInterpretation", "")).upper()
-    samples = safe_get(ds, "SamplesPerPixel", None)
-    series_desc = str(safe_get(ds, "SeriesDescription", "")).lower()
-    image_type = " ".join(map(str, safe_get(ds, "ImageType", []))).lower()
-    burned = str(safe_get(ds, "BurnedInAnnotation", "")).upper()
-    rows = safe_get(ds, "Rows", None)
-    cols = safe_get(ds, "Columns", None)
+    # Check Image Type
+    if hasattr(ds, "ImageType"):
+        image_type = str(ds.ImageType).upper()
+        if "SECONDARY" in image_type:
+            score += 3
+            reasons.append("Image Type: SECONDARY")
+        if "LOCALIZER" in image_type or "SCOUT" in image_type:
+            score += 5
+            reasons.append(f"Image Type: {image_type}")
+        if "SCREEN" in image_type or "SAVE" in image_type:
+            score += 4
+            reasons.append("Image Type: SCREEN SAVE")
 
-    # 1) Non-CT modalities are strong signals
-    if modality in NON_CT_MODALITIES:
-        score += 4
-        reasons.append(f"modality={modality}")
-
-    # 2) RGB / color-ish photometric or SamplesPerPixel==3 suggests a scanned/cover image
-    if photometric in {"RGB", "PALETTE COLOR", "YBR_FULL", "YBR_FULL_422"}:
-        score += 3
-        reasons.append(f"photometric={photometric}")
-    if samples == 3:
-        score += 2
-        reasons.append("samples_per_pixel=3")
-
-    # 3) SeriesDescription hints
-    for kw in SERIES_HINTS:
-        if kw in series_desc:
+    # Check Instance Number (cover slides often first)
+    if hasattr(ds, "InstanceNumber"):
+        if ds.InstanceNumber == 1:
             score += 2
-            reasons.append(f"series_desc~{kw}")
-            break
+            reasons.append("Instance Number: 1 (first in series)")
 
-    # 4) ImageType contains "SECONDARY" or "DERIVED" often for captures/scans
-    if "secondary" in image_type or "derived" in image_type:
-        score += 1
-        reasons.append("image_type=secondary/derived")
+    # Check for Burned In Annotation
+    if hasattr(ds, "BurnedInAnnotation"):
+        if ds.BurnedInAnnotation == "YES":
+            score += 5
+            reasons.append("Burned In Annotation: YES")
 
-    # 5) Burned-in annotation might indicate label/cover captures
-    if burned == "YES":
-        score += 1
-        reasons.append("burned_in_annotation=YES")
+    # Check SOP Class UID for Secondary Capture
+    if hasattr(ds, "SOPClassUID"):
+        # Secondary Capture Image Storage
+        if ds.SOPClassUID == "1.2.840.10008.5.1.4.1.1.7":
+            score += 4
+            reasons.append("SOP Class: Secondary Capture")
+        # Grayscale Softcopy Presentation State
+        elif "1.2.840.10008.5.1.4.1.1.11" in ds.SOPClassUID:
+            score += 3
+            reasons.append("SOP Class: Presentation State")
 
-    # 6) Aspect ratio not 1:1 (CT is commonly square 512x512; covers vary)
-    if rows and cols:
-        ar = ratio(rows, cols)
-        if ar >= 1.3:
+    # Check Conversion Type
+    if hasattr(ds, "ConversionType"):
+        if ds.ConversionType in ["WSD", "SI", "DV"]:
+            score += 3
+            reasons.append(f"Conversion Type: {ds.ConversionType}")
+
+    # Check for unusual dimensions (screenshots might have different aspect ratios)
+    if hasattr(ds, "Rows") and hasattr(ds, "Columns"):
+        aspect_ratio = ds.Columns / ds.Rows
+        if aspect_ratio > 1.5 or aspect_ratio < 0.6:
             score += 1
-            reasons.append(f"aspect_ratio≈{ar:.2f}")
+            reasons.append(f"Unusual aspect ratio: {aspect_ratio:.2f}")
 
-        # Big square grayscale 512-ish screams CT body slice → downweight
-        if modality == "CT" and photometric.startswith("MONOCHROME"):
-            # Typical CT traits; push score down
-            if rows in (512, 1024) and cols in (512, 1024):
-                score -= 3
-                reasons.append("ct_like_square_slice")
-            else:
-                score -= 1
-                reasons.append("ct_grayscale")
-
-    # Gentle nudge if modality is empty but color-ish signals exist
-    if not modality and (photometric in {"RGB", "PALETTE COLOR"} or samples == 3):
-        score += 1
-        reasons.append("unknown_modality_but_colorish")
-
-    return score, reasons
+    return {"score": score, "reasons": reasons, "is_cover_slide": score >= 3}
 
 
-def iter_candidates(root, exts=(".dcm", ".dat")):
-    for p in Path(root).rglob("*"):
-        if not p.is_file():
-            continue
-        if exts and p.suffix.lower() not in exts:
-            # Some sites ditch extensions; peek header quickly
-            try:
-                if not is_dicom(str(p)):
-                    continue
-            except Exception:
-                continue
-        else:
-            try:
-                if not is_dicom(str(p)):
-                    continue
-            except Exception:
-                continue
-        yield p
+def analyze_dicom_file(file_path: Path) -> Dict:
+    """Analyze a single DICOM file."""
+    try:
+        ds = pydicom.dcmread(file_path, stop_before_pixels=True)
+        analysis = is_potential_cover_slide(ds)
+
+        return {
+            "path": str(file_path),
+            "score": analysis["score"],
+            "is_cover_slide": analysis["is_cover_slide"],
+            "reasons": analysis["reasons"],
+            "metadata": {
+                "PatientID": getattr(ds, "PatientID", "N/A"),
+                "StudyDescription": getattr(ds, "StudyDescription", "N/A"),
+                "SeriesDescription": getattr(ds, "SeriesDescription", "N/A"),
+                "Modality": getattr(ds, "Modality", "N/A"),
+                "InstanceNumber": getattr(ds, "InstanceNumber", "N/A"),
+                "ImageType": str(getattr(ds, "ImageType", "N/A")),
+            },
+        }
+    except Exception as e:
+        return {"path": str(file_path), "error": str(e)}
+
+
+def find_dicom_files(root_dir: Path, extensions: List[str] = None) -> List[Path]:
+    """Recursively find all .dat files in directory."""
+    if extensions is None:
+        extensions = [".dat"]
+
+    dicom_files = []
+
+    for root, dirs, files in os.walk(root_dir):
+        for file in files:
+            file_path = Path(root) / file
+
+            # Only match .dat files
+            if file_path.suffix.lower() in extensions:
+                dicom_files.append(file_path)
+
+    return dicom_files
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Scout likely cover-slide DICOMs fast.")
-    ap.add_argument("path", help="Directory to scan (e.g., /data2/radimages/rsnacontrolCT)")
-    ap.add_argument(
-        "--top", type=int, default=50, help="Show top-N candidates (default: 50)"
+    parser = argparse.ArgumentParser(
+        description="Search for DICOM cover slides in a directory tree",
+        formatter_class=RichHelpFormatter,
     )
-    ap.add_argument(
-        "--csv", type=str, default="", help="Optional CSV path to write results"
+    parser.add_argument(
+        "directory",
+        type=str,
+        nargs="?",
+        default=".",
+        help="Root directory to search (default: current directory)",
     )
-    ap.add_argument(
-        "--limit", type=int, default=0, help="Stop after reading N files (0 = no limit)"
+    parser.add_argument(
+        "--min-score",
+        type=int,
+        default=3,
+        help="Minimum score to consider a file as cover slide (default: 3)",
     )
-    ap.add_argument("--verbose", action="store_true", help="Print reasons for scoring")
-    args = ap.parse_args()
 
-    rows_out = []
-    count = 0
+    args = parser.parse_args()
 
-    for p in iter_candidates(args.path):
-        try:
-            ds = pydicom.dcmread(str(p), stop_before_pixels=True, force=True)
-        except Exception:
-            continue
+    root_dir = Path(args.directory).resolve()
 
-        score, reasons = score_dicom(ds)
-        modality = str(safe_get(ds, "Modality", ""))
-        series_desc = str(safe_get(ds, "SeriesDescription", ""))
-        photometric = str(safe_get(ds, "PhotometricInterpretation", ""))
-        samples = safe_get(ds, "SamplesPerPixel", "")
-        rows_tag = safe_get(ds, "Rows", "")
-        cols_tag = safe_get(ds, "Columns", "")
-        burned = str(safe_get(ds, "BurnedInAnnotation", ""))
+    if not root_dir.exists():
+        print(f"Error: Directory '{root_dir}' does not exist")
+        return
 
-        rows_out.append(
-            {
-                "path": str(p),
-                "score": score,
-                "modality": modality,
-                "series_description": series_desc,
-                "photometric": photometric,
-                "samples_per_pixel": samples,
-                "rows": rows_tag,
-                "cols": cols_tag,
-                "burned_in_annotation": burned,
-            }
-        )
+    print(f"Searching for DICOM files in: {root_dir}")
+    print("=" * 80)
 
-        count += 1
-        if args.limit and count >= args.limit:
-            break
+    dicom_files = find_dicom_files(root_dir)
+    print(f"\nFound {len(dicom_files)} DICOM files")
+    print("=" * 80)
 
-    # Rank by score desc, then surface some context-heavy fields
-    rows_out.sort(key=lambda r: r["score"], reverse=True)
+    results = []
+    for file_path in dicom_files:
+        result = analyze_dicom_file(file_path)
+        if "error" not in result:
+            results.append(result)
 
-    print(f"\nScanned {len(rows_out)} DICOMs under {args.path}")
-    print(f"Top {min(args.top, len(rows_out))} likely cover slides:\n")
+    # Sort by score (highest first)
+    results.sort(key=lambda x: x["score"], reverse=True)
 
-    header = [
-        "rank",
-        "score",
-        "modality",
-        "photometric",
-        "samples_per_pixel",
-        "rows",
-        "cols",
-        "burned_in_annotation",
-        "series_description",
-        "path",
-    ]
-    print("\t".join(header))
+    # Display results
+    cover_slides = [r for r in results if r["score"] >= args.min_score]
 
-    for i, r in enumerate(rows_out[: args.top], start=1):
-        line = [
-            str(i),
-            str(r["score"]),
-            r["modality"],
-            r["photometric"],
-            str(r["samples_per_pixel"]),
-            str(r["rows"]),
-            str(r["cols"]),
-            r["burned_in_annotation"],
-            re.sub(r"\s+", " ", r["series_description"]).strip()[:80],
-            r["path"],
-        ]
-        print("\t".join(line))
-        if args.verbose:
-            # Recompute reasons (cheap) just for display
-            try:
-                ds = pydicom.dcmread(r["path"], stop_before_pixels=True, force=True)
-                _, reasons = score_dicom(ds)
-                print("   reasons:", ", ".join(reasons))
-            except Exception:
-                pass
+    if cover_slides:
+        print(f"\n🎯 COVER SLIDES FOUND ({len(cover_slides)}):")
+        print("=" * 80)
 
-    if args.csv:
-        with open(args.csv, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=list(rows_out[0].keys()))
-            writer.writeheader()
-            writer.writerows(rows_out)
-        print(f"\nCSV written → {args.csv}")
+        for result in cover_slides:
+            print(f"{result['path']}")
+    else:
+        print("\n❌ No cover slides found")
 
 
 if __name__ == "__main__":
