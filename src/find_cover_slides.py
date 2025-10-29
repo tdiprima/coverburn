@@ -121,7 +121,7 @@ def find_dicom_files(root_dir: Path, extensions: List[str] = None) -> List[Path]
 def main():
     parser = argparse.ArgumentParser(
         description="Search for DICOM cover slides in a directory tree",
-        formatter_class=RichHelpFormatter
+        formatter_class=RichHelpFormatter,
     )
     parser.add_argument(
         "directory",
