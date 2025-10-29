@@ -10,3 +10,4 @@ wheels/
 .venv
 
 *.dat
+debug_output.png
