@@ -78,7 +78,7 @@ print("=" * 80)
 print("\nTesting OCR on all preprocessed images...")
 print("=" * 80)
 
-ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+ocr = PaddleOCR(use_angle_cls=True, lang="en")
 
 all_results = []
 
