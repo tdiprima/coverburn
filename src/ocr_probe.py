@@ -34,7 +34,7 @@ img = Image.fromarray(pixel_array)
 
 # Debug: Save image to inspect it
 img.save("debug_output.png")
-print(f"Image saved as debug_output.png")
+print("Image saved as debug_output.png")
 print(f"Image shape: {np.array(img).shape}")
 print(f"Image size: {img.size}")
 print(f"Pixel value range: {np.min(np.array(img))} to {np.max(np.array(img))}")
