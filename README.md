@@ -6,8 +6,6 @@ OCR showdown for pathology and radiology cover slides — PaddleOCR vs Tesseract
 
 It was born from frustration with traditional OCR tools fumbling text on medical images (looking at you, `$` vs `S` 👀).
 
-Use tag `0.1.0`.
-
 ## 🚀 Features
 - Reads **DICOM** or `.dat` files directly (even if renamed)
 - Extracts pixel data with `pydicom`
@@ -54,12 +52,12 @@ Patient Name: J DOE
 Accession #: 1234567
 ```
 
-## 🧪 Future Plans
+## 🧪 Result
 
-* Batch mode: scan entire directories
-* JSON/CSV output for easier diffing
-* Comparison metrics between OCR engines
-* Preprocessing tweaks for rotation, blur, and low contrast
+PaddleOCR gave totally blank results.  
+It may be optimized for natural scene text or document layouts rather than the burned-in, grayscale, high-contrast style of these medical images.  
+Tesseract performed as expected.  
+Verdict: Stick with Tesseract.
 
 ## 👩‍💻 Author
 
