@@ -40,31 +40,11 @@ or if you just wanna test the first file it finds in a folder:
 python ocr_probe.py /path/to
 ```
 
-Example output:
-
-```
-=== PaddleOCR Results ===
-Patient Name: J DOE (conf: 0.96)
-Accession #: 1234567 (conf: 0.92)
-
-=== Tesseract Results ===
-Patient Name: J DOE
-Accession #: 1234567
-```
-
 ## 🧪 Result
 
-PaddleOCR gave totally blank results.  
-It may be optimized for natural scene text or document layouts rather than the burned-in, grayscale, high-contrast style of these medical images.  
-Tesseract performed as expected.  
-Verdict: Stick with Tesseract.
-
-## 👩‍💻 Author
-
-**Bear** — DevOps engineer, slide whisperer, and Tesseract survivor.
-
-## ⚖️ License
-
-MIT License © 2025 Bear
+* PaddleOCR gave totally blank results.
+* It may be optimized for natural scene text or document layouts rather than the burned-in, grayscale, high-contrast style of these medical images.
+* Tesseract performed as expected.
+* **Verdict: Stick with Tesseract.**
 
 <br>
