@@ -47,4 +47,8 @@ python ocr_probe.py /path/to
 * Tesseract performed as expected.
 * **Verdict: Stick with Tesseract.**
 
+---
+
+See also: https://github.com/tdiprima/OCRFormDuel
+
 <br>
