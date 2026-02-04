@@ -8,6 +8,7 @@ Cover slides typically have:
 """
 
 import argparse
+import operator
 import os
 from pathlib import Path
 from typing import Dict, List
@@ -62,7 +63,7 @@ def is_potential_cover_slide(ds: pydicom.Dataset) -> Dict[str, any]:
 
     # Check Conversion Type
     if hasattr(ds, "ConversionType"):
-        if ds.ConversionType in ["WSD", "SI", "DV"]:
+        if ds.ConversionType in ("WSD", "SI", "DV"):
             score += 3
             reasons.append(f"Conversion Type: {ds.ConversionType}")
 
@@ -159,7 +160,7 @@ def main():
             results.append(result)
 
     # Sort by score (highest first)
-    results.sort(key=lambda x: x["score"], reverse=True)
+    results.sort(key=operator.itemgetter("score"), reverse=True)
 
     # Display results
     cover_slides = [r for r in results if r["score"] >= args.min_score]
@@ -169,7 +170,7 @@ def main():
         print("=" * 80)
 
         for result in cover_slides:
-            print(f"{result['path']}")
+            print(result["path"])
     else:
         print("\n❌ No cover slides found")
 
