@@ -1,4 +1,5 @@
 # 🩻 coverburn
+PaddleOCR vs Tesseract (DICOM)
 
 OCR showdown for pathology and radiology cover slides — PaddleOCR vs Tesseract 🔥
 
